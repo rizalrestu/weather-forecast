@@ -1,0 +1,107 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+  init: true
+  entrypoint: ["/bin/bash", "-c", "exec /entrypoint \"$$@\"", "--"]
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    PYTHONPATH: /opt/airflow
+    AQI_DB_URL: postgresql://airflow:airflow@postgres/aqi_db
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./models:/opt/airflow/models
+    - ./data:/opt/airflow/data
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        python -m airflow db migrate
+        python -m airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com || true
+    restart: on-failure
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: ["python", "-m", "airflow", "webserver"]
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: ["python", "-m", "airflow", "scheduler"]
+    restart: always
+
+  dashboard:
+    <<: *airflow-common
+    command: ["python", "-m", "streamlit", "run", "src/serve/dashboard.py",
+              "--server.port=8501", "--server.address=0.0.0.0"]
+    ports:
+      - "8501:8501"
+    restart: always
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://airflow:airflow@postgres/mlflow
+      MLFLOW_ARTIFACT_ROOT: /opt/mlflow/artifacts
+    volumes:
+      - mlflow-artifacts:/opt/mlflow/artifacts
+    command: >
+      bash -c "pip install psycopg2-binary --quiet &&
+      mlflow server
+      --backend-store-uri postgresql://airflow:airflow@postgres/mlflow
+      --artifacts-destination /opt/mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  postgres-db:
+  airflow-logs:
+  mlflow-artifacts:

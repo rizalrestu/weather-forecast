@@ -16,28 +16,28 @@ WEATHER_URL     = "https://api.open-meteo.com/v1/forecast"
 AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
 
-def fetch_weather(lat: float, lon: float, past_days: int = 7) -> dict:
+def fetch_weather(lat: float, lon: float, past_days: int = 8) -> dict:
     params = {
         "latitude":   lat,
         "longitude":  lon,
         "hourly":     "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m",
         "timezone":   "Asia/Jakarta",
         "past_days":  past_days,
-        "forecast_days": 1,
+        "forecast_days": 2,
     }
     resp = requests.get(WEATHER_URL, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
 
-def fetch_air_quality(lat: float, lon: float, past_days: int = 7) -> dict:
+def fetch_air_quality(lat: float, lon: float, past_days: int = 8) -> dict:
     params = {
         "latitude":   lat,
         "longitude":  lon,
         "hourly":     "pm2_5,pm10,carbon_monoxide,nitrogen_dioxide",
         "timezone":   "Asia/Jakarta",
         "past_days":  past_days,
-        "forecast_days": 1,
+        "forecast_days": 2,
     }
     resp = requests.get(AIR_QUALITY_URL, params=params, timeout=30)
     resp.raise_for_status()
@@ -67,11 +67,12 @@ def build_city_records(city: str, coords: dict, weather: dict, aq: dict) -> list
     ]
 
 
-def fetch_all_cities(past_days: int = 7, raw_dir: Path = None) -> list[dict]:
+def fetch_all_cities(past_days: int = 8, raw_dir: Path = None) -> list[dict]:
     """
     Fetch recent weather + AQ for all cities.
     Returns list of dicts (XCom-serializable for Airflow).
-    past_days=7 gives enough history to compute the 168h lag features.
+    past_days=8 gives 168h of lag context plus a spare day, so a full 24h
+    window survives build_features() no matter what hour the DAG runs.
     """
     if raw_dir:
         raw_dir = Path(raw_dir)

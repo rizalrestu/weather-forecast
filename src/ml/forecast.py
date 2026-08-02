@@ -29,7 +29,7 @@ def forecast_24h(model: XGBRegressor, df_city: pd.DataFrame) -> pd.DataFrame:
 
     all_ts = df["timestamp"]
     # Last 24 rows = open-meteo weather forecast; row -25 = last confirmed actual hour
-    now            = all_ts.iloc[-25]
+    now            = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None).floor("h")
     history        = df[df["timestamp"] <= now].copy()
     future_weather = df[df["timestamp"] > now].copy()
 

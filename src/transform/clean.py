@@ -21,6 +21,7 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["timestamp", "city", "pm2_5_ugm3"])
     df = df[df["pm2_5_ugm3"] >= 0]
     df = df[df["temperature_2m_c"].between(-10, 55)]
+    df = df[df["timestamp"] <= pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None)]
     return df.reset_index(drop=True)
 
 

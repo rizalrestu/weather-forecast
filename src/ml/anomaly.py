@@ -9,9 +9,11 @@ import mlflow
 from pathlib import Path
 from sklearn.ensemble import IsolationForest
 
-# Includes actual PM2.5 so the model detects spikes relative to recent history + weather context
+# Includes actual PM2.5 so the model detects spikes relative to recent history + weather context.
+# No "month": training data covers a fixed span, so any later month falls outside its range and
+# gets isolated instantly — every row in a new month would be flagged.
 ANOMALY_FEATURE_COLS = [
-    "hour", "month", "city_encoded",
+    "hour", "city_encoded",
     "temperature_2m_c", "relative_humidity_pct", "wind_speed_10m_kmh",
     "pm2_5_lag_1h", "pm2_5_lag_24h", "pm2_5_lag_168h",
     "pm2_5_roll_mean_24h", "pm2_5_roll_std_24h",

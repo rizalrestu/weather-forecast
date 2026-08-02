@@ -29,7 +29,7 @@ def aqi_pipeline():
         from pathlib import Path
         from src.ingestion.extract_api import fetch_all_cities
         raw_dir = Path("/opt/airflow/data/raw")
-        records = fetch_all_cities(past_days=7, raw_dir=raw_dir)
+        records = fetch_all_cities(past_days=8, raw_dir=raw_dir)
         print(f"Extracted {len(records)} records across all cities.")
         return records
 
@@ -45,8 +45,10 @@ def aqi_pipeline():
         feat_df = build_features(df)
 
         # Keep only most recent 24h for prediction output
-        cutoff = feat_df["timestamp"].max() - pd.Timedelta(hours=23)
-        recent = feat_df[feat_df["timestamp"] >= cutoff].copy()
+        now    = pd.Timestamp.now(tz="Asia/Jakarta").tz_localize(None).floor("h")
+        recent = feat_df[
+            feat_df["timestamp"].between(now - pd.Timedelta(hours=23), now)
+        ].copy()
 
         keep_cols = ["timestamp", "city", "latitude", "longitude",
                      "pm2_5_ugm3", "pm10_ugm3", "carbon_monoxide_ugm3",
@@ -65,14 +67,17 @@ def aqi_pipeline():
     def load(feat_records: list) -> list:
         """Validate and write clean readings to aqi_readings table."""
         import pandas as pd
-        from src.transform.clean import write_readings
+        from src.transform.clean import validate, write_readings
 
         df = pd.DataFrame(feat_records)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-        n = write_readings(df)
+        df = validate(df)
+        n  = write_readings(df)
         print(f"Loaded {n} rows into aqi_readings.")
-        return feat_records  # pass through for predict task
+
+        df["timestamp"] = df["timestamp"].astype(str)
+        return df.to_dict(orient="records")
 
     @task()
     def predict(feat_records: list) -> None:

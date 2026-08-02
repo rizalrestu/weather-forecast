@@ -59,7 +59,7 @@ def detect(model: IsolationForest, df: pd.DataFrame) -> pd.DataFrame:
     preds  = model.predict(df[ANOMALY_FEATURE_COLS])
 
     out = df[["timestamp", "city", "pm2_5_ugm3"]].copy()
-    out["anomaly_score"] = (-scores).round(4)
+    out["anomaly_score"] = (-scores).round(6)
     out["is_anomaly"]    = preds == -1
     return out
 

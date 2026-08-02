@@ -233,8 +233,8 @@ if not anomalies.empty:
         st.warning(f"⚠️ {len(anomalies)} anomali terdeteksi di {city.capitalize()}.")
 
     def _severity(score: float) -> str:
-        if score > 0.5:   return "🔴 Ekstrem"
-        elif score > 0.3: return "🟠 Tinggi"
+        if score > 0.05:   return "🔴 Ekstrem"
+        elif score > 0.02: return "🟠 Tinggi"
         else:             return "🟡 Sedang"
 
     display_anom = (
